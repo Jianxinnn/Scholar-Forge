@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}ScholarForge Search{% endblock %}
+{% block content %}
+<section class="search-shell" id="search">
+  <div class="search-head">
+    <h1>Search research evidence</h1>
+    <p>Run ScholarForge locally and produce an auditable bundle for every search.</p>
+  </div>
+
+  <form class="search-form" data-run-form>
+    <label class="field field-wide">
+      <span>Research question</span>
+      <input name="question" type="search" required autofocus placeholder="protein binder design with diffusion models">
+    </label>
+    <div class="scope-grid">
+      <label class="field">
+        <span>Profile</span>
+        <select name="profile">
+          <option value="general">general</option>
+          <option value="biomol">biomol</option>
+          <option value="agent_skills">agent_skills</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Year range</span>
+        <input name="year_range" placeholder="2021-">
+      </label>
+      <label class="field">
+        <span>Max papers</span>
+        <input name="max_papers" type="number" min="1" max="200" value="{{ defaults.max_papers }}">
+      </label>
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced</summary>
+      <div class="advanced-grid">
+        <fieldset>
+          <legend>Providers</legend>
+          {% for provider in providers %}
+          <label class="check-row">
+            <input type="checkbox" name="providers" value="{{ provider.name }}" {% if provider.enabled %}checked{% endif %}>
+            <span>{{ provider.name }}</span>
+            <small>{{ "available" if provider.available else "missing" }}</small>
+          </label>
+          {% endfor %}
+        </fieldset>
+        <fieldset>
+          <legend>Options</legend>
+          <label class="check-row"><input type="checkbox" name="use_llm" checked><span>Use LLM brief when configured</span></label>
+          <label class="check-row"><input type="checkbox" name="llm_triage"><span>LLM triage</span></label>
+          <label class="check-row"><input type="checkbox" name="read_pdf"><span>Read selected PDFs</span></label>
+        </fieldset>
+      </div>
+    </details>
+
+    <div class="form-actions">
+      <button class="primary" type="submit">Search</button>
+      <span class="form-message" data-form-message></span>
+    </div>
+  </form>
+</section>
+
+<section class="runs-section">
+  <div class="section-title">
+    <h2>Recent runs</h2>
+  </div>
+  {% if runs %}
+  <div class="run-list">
+    {% for run in runs %}
+    <a class="run-row" href="/runs/{{ run.run_id }}">
+      <span>
+        <strong>{{ run.question or run.run_id }}</strong>
+        <small>{{ run.profile or "general" }} &middot; {{ run.created_at or run.run_id }}</small>
+      </span>
+      <span class="run-metrics">
+        <span class="badge status-{{ run.status }}">{{ run.status }}</span>
+        <small>{{ run.counts.sources or 0 }} sources &middot; {{ run.counts.evidence or 0 }} evidence</small>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No runs yet. Start with a research question.</p>
+  {% endif %}
+</section>
+{% endblock %}

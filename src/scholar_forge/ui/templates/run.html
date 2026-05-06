@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}{{ bundle.request.get("question", run_id) }} &middot; ScholarForge{% endblock %}
+{% block content %}
+<section class="run-layout" data-run-id="{{ run_id }}">
+  <header class="run-header">
+    <div>
+      <a class="back-link" href="/">&larr; Runs</a>
+      <h1>{{ bundle.request.get("question", bundle.meta.question or run_id) }}</h1>
+      <p class="muted">
+        {{ bundle.request.get("profile", "general") }} &middot;
+        <span data-count-sources>{{ bundle.counts.sources or 0 }}</span> sources &middot;
+        <span data-count-evidence>{{ bundle.counts.evidence or 0 }}</span> evidence &middot;
+        <span data-count-resources>{{ bundle.counts.resources or 0 }}</span> resources &middot;
+        <span class="badge status-{{ bundle.meta.status }}" data-run-status>{{ bundle.meta.status }}</span>
+        <span data-run-stage>{{ bundle.meta.stage }}</span>
+      </p>
+      {% if bundle.meta.error %}
+      <p class="error-text">{{ bundle.meta.error }}</p>
+      {% endif %}
+    </div>
+    <div class="header-actions">
+      <button class="secondary" data-cancel-run {% if bundle.meta.status not in ["queued", "running", "cancel_requested"] %}disabled{% endif %}>Cancel</button>
+      <a class="secondary" href="/artifacts/{{ run_id }}/brief">Brief</a>
+      <a class="secondary" href="/artifacts/{{ run_id }}/references">BibTeX</a>
+    </div>
+  </header>
+
+  <details class="refine-box">
+    <summary>Refine search</summary>
+    <form class="refine-form" data-run-form>
+      <input type="hidden" name="refined_from" value="{{ run_id }}">
+      <input type="hidden" name="providers" value="{{ bundle.request.get('providers', []) | join(',') }}">
+      <label class="field field-wide">
+        <span>Research question</span>
+        <input name="question" required value="{{ bundle.request.get('question', '') }}">
+      </label>
+      <div class="scope-grid">
+        <label class="field">
+          <span>Profile</span>
+          <select name="profile">
+            {% for profile in ["general", "biomol", "agent_skills"] %}
+            <option value="{{ profile }}" {% if bundle.request.get("profile") == profile %}selected{% endif %}>{{ profile }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Year range</span>
+          <input name="year_range" value="{{ bundle.request.get('year_range', '') }}">
+        </label>
+        <label class="field">
+          <span>Max papers</span>
+          <input name="max_papers" type="number" min="1" max="200" value="{{ bundle.request.get('max_papers', '') }}">
+        </label>
+      </div>
+      <label class="check-row"><input type="checkbox" name="use_llm" {% if bundle.request.get("use_llm", True) %}checked{% endif %}><span>Use LLM brief when configured</span></label>
+      <label class="check-row"><input type="checkbox" name="llm_triage" {% if bundle.request.get("llm_triage") %}checked{% endif %}><span>LLM triage</span></label>
+      <label class="check-row"><input type="checkbox" name="read_pdf" {% if bundle.request.get("read_pdf") %}checked{% endif %}><span>Read selected PDFs</span></label>
+      <div class="form-actions">
+        <button class="primary" type="submit">Run refined search</button>
+        <span class="form-message" data-form-message></span>
+      </div>
+    </form>
+  </details>
+
+  <div class="workspace">
+    <section class="result-pane">
+      <section class="progress-panel" data-progress-panel>
+        <div class="progress-heading">
+          <div>
+            <h2>Run progress</h2>
+            <p class="muted">Live pipeline stages, provider results, and bundle artifacts.</p>
+          </div>
+          <span class="badge status-{{ bundle.meta.status }}" data-progress-status>{{ bundle.meta.status }}</span>
+        </div>
+        <div class="stepper" data-progress-steps>
+          <div class="step state-{{ 'done' if bundle.counts.queries else 'active' }}">
+            <span class="step-dot"></span>
+            <span>Planning</span>
+          </div>
+          <div class="step state-{{ 'done' if bundle.provenance else 'pending' }}">
+            <span class="step-dot"></span>
+            <span>Provider search</span>
+          </div>
+          <div class="step state-{{ 'done' if bundle.counts.sources else 'pending' }}">
+            <span class="step-dot"></span>
+            <span>Bundle write</span>
+          </div>
+        </div>
+        <div class="progress-grid">
+          <div class="provider-panel">
+            <h3>Providers</h3>
+            <div class="provider-list" data-provider-list>
+              <p class="muted">Waiting for provider events...</p>
+            </div>
+          </div>
+          <div class="event-panel">
+            <h3>Recent events</h3>
+            <div class="event-list" data-event-list>
+              {% if bundle.provenance %}
+              {% for row in bundle.provenance[-6:] %}
+              <div class="event-row">
+                <span class="badge status-{{ row.status }}">{{ row.status }}</span>
+                <span>{{ row.provider }}</span>
+                <small>{{ row.result_count if row.result_count is defined else row.error or row.raw_file or "" }}</small>
+              </div>
+              {% endfor %}
+              {% else %}
+              <p class="muted">No events yet.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <nav class="tabs" data-tabs>
+        <button class="tab active" data-tab="brief">Brief</button>
+        <button class="tab" data-tab="sources">Sources</button>
+        <button class="tab" data-tab="evidence">Evidence</button>
+        <button class="tab" data-tab="resources">Resources</button>
+        <button class="tab" data-tab="provenance">Provenance</button>
+        <button class="tab" data-tab="artifacts">Artifacts</button>
+      </nav>
+
+      <section class="tab-panel active" data-panel="brief">
+        <article class="brief-body">{{ bundle.brief_html | safe }}</article>
+      </section>
+
+      <section class="tab-panel" data-panel="sources">
+        <div class="card-list">
+          {% for source in bundle.sources %}
+          {% set triage = source.triage or {} %}
+          <article class="source-card">
+            <div class="card-topline">
+              <span class="badge decision-{{ triage.get('decision', 'maybe') }}">{{ triage.get("decision", "maybe") }}</span>
+              <span class="score">score {{ "%.3f"|format(triage.get("total_score", 0) or 0) }}</span>
+              <span class="muted">{{ source.provider }}{% if source.year %} &middot; {{ source.year }}{% endif %}</span>
+            </div>
+            <h3>{{ source.title or source.source_id }}</h3>
+            {% if source.venue %}<p class="muted">{{ source.venue }}</p>{% endif %}
+            <p>{{ (source.abstract or source.snippet or "")[:520] }}</p>
+            <div class="card-actions">
+              <button class="secondary small" data-followup-intent="why_decision" data-source-id="{{ source.source_id }}">Why</button>
+              <button class="secondary small" data-followup-intent="evidence_for" data-source-id="{{ source.source_id }}">Evidence</button>
+              {% if source.url %}<a class="secondary small" href="{{ source.url }}" target="_blank" rel="noopener">Open</a>{% endif %}
+              {% if source.doi %}<span class="mono">{{ source.doi }}</span>{% endif %}
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="evidence">
+        <div class="card-list">
+          {% for item in bundle.evidence %}
+          <article class="source-card">
+            <div class="card-topline">
+              <span class="mono">{{ item.evidence_id }}</span>
+              <span class="muted">{{ item.source_id }} &middot; confidence {{ "%.2f"|format(item.confidence or 0) }}</span>
+            </div>
+            <h3>{{ item.claim }}</h3>
+            <p>{{ item.evidence_text }}</p>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="resources">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Kind</th><th>Title</th><th>Sources</th><th>URL</th></tr></thead>
+            <tbody>
+              {% for resource in bundle.resources %}
+              <tr>
+                <td><span class="badge">{{ resource.resource_kind }}</span></td>
+                <td>{{ resource.title or resource.resource_id }}</td>
+                <td class="mono">{{ resource.source_ids | join(", ") }}</td>
+                <td>{% if resource.url %}<a href="{{ resource.url }}" target="_blank" rel="noopener">{{ resource.url }}</a>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="provenance">
+        <div class="live-note">
+          <strong>Live progress</strong>
+          <span class="muted">This page refreshes as bundle artifacts appear during an active run.</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Status</th><th>Provider</th><th>Query</th><th>Detail</th></tr></thead>
+            <tbody>
+              {% for row in bundle.provenance %}
+              <tr>
+                <td><span class="badge status-{{ row.status }}">{{ row.status }}</span></td>
+                <td>{{ row.provider }}</td>
+                <td>{{ row.query or "" }}</td>
+                <td>{{ row.error or row.result_count or row.raw_file or "" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="artifacts">
+        <div class="artifact-grid">
+          {% for name, exists in bundle.artifacts.items() %}
+          <a class="artifact-link {% if not exists %}disabled{% endif %}" href="/artifacts/{{ run_id }}/{{ name }}">{{ name }}</a>
+          {% endfor %}
+        </div>
+        <p class="muted">Bundle path: <span class="mono">{{ bundle.root }}</span></p>
+      </section>
+    </section>
+
+    <aside class="followup">
+      <h2>Ask this bundle</h2>
+      <p class="muted">Answers stay grounded in the current bundle and are not persisted.</p>
+      <div class="quick-grid">
+        <button class="secondary small" data-followup-intent="top_sources">Top sources</button>
+        <button class="secondary small" data-followup-intent="resources_by_kind">Resources</button>
+        <button class="secondary small" data-followup-intent="gaps">Gaps</button>
+        <button class="secondary small" data-followup-intent="provider_errors">Provider errors</button>
+      </div>
+      <form class="followup-form" data-followup-form>
+        <textarea name="question" rows="4" placeholder="Which sources are most important?"></textarea>
+        <button class="primary" type="submit">Ask</button>
+      </form>
+      <div class="answer-box" data-followup-answer></div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

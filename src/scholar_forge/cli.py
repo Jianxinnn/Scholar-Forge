@@ -119,6 +119,21 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    try:
+        from .ui.app import run_server
+    except ImportError as exc:
+        print(f"error: local Web UI dependencies are not installed: {exc}", file=sys.stderr)
+        print('Install them with: pip install -e ".[ui]"', file=sys.stderr)
+        return 1
+    return run_server(
+        host=args.host,
+        port=args.port,
+        runs_dir=args.runs_dir,
+        config_path=args.config,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="scholar-forge", description="Build structured scholarly research bundles.")
     parser.add_argument("--config", default=None, help="Path to scholarforge.yaml")
@@ -159,6 +174,12 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--network", action="store_true", help="Run live one-result provider checks")
     doctor.add_argument("--query", default="protein design")
     doctor.set_defaults(func=cmd_doctor)
+
+    ui = sub.add_parser("ui", help="Start the optional local Web UI")
+    ui.add_argument("--host", default="127.0.0.1")
+    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--runs-dir", default="./scholar-runs")
+    ui.set_defaults(func=cmd_ui)
     return parser
 
 

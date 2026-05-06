@@ -39,6 +39,29 @@ ScholarForge does:
 
 ScholarForge does not do MVP execution, durable claim storage, vector memory, chat orchestration, or final manuscript writing.
 
+## Optional Local UI
+
+The local Web UI is an optional interface, not a new persistence layer. It is installed with the `ui` extra and started with:
+
+```bash
+scholar-forge ui
+```
+
+UI boundaries:
+
+- local single-user server only, bound to `127.0.0.1` by default,
+- no database,
+- no account system,
+- no API key management,
+- no durable chat memory,
+- no changes to the bundle format.
+
+The UI writes runs under `./scholar-runs/<timestamp>-<slug>/` by default. Each run directory is a normal ScholarForge bundle plus a UI-only `run.json` file for job status such as `queued`, `running`, `done`, `error`, or `cancelled`. `run.json` is not part of the bundle contract and should be ignored by downstream bundle consumers.
+
+The result page reads bundle artifacts directly and presents a read-only audit view for `brief.md`, sources, triage, evidence, resources, and provenance. Follow-up questions are scoped to the current bundle. Deterministic quick actions inspect bundle records directly; optional LLM synthesis uses a compressed bundle context and must cite source or evidence identifiers.
+
+The core pipeline exposes only generic `progress` and `should_cancel` hooks for UI observability and best-effort cancellation. These hooks do not depend on FastAPI or UI concepts, and CLI/Python API behavior remains unchanged when hooks are omitted.
+
 ## Provider Order
 
 Default providers:

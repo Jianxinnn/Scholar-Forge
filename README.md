@@ -14,6 +14,7 @@ Research question in -> auditable evidence bundle out
 
 - CLI: `scholar-forge`
 - Python API: `scholar_forge`
+- Optional local Web UI: `scholar-forge ui`
 - Agent entry: root `SKILL.md`
 - Bundle contract: `docs/bundle-format.md`
 
@@ -33,6 +34,36 @@ scholar-forge inspect ./scholar-bundle
 ```
 
 If you are working directly from this repository and prefer `uv`, replace `scholar-forge` with `uv run scholar-forge`.
+
+## Local Web UI
+
+ScholarForge includes an optional local, single-user Web UI for search-style bundle creation and review.
+
+```bash
+python3 -m pip install -e ".[ui]"
+scholar-forge ui
+```
+
+If you are using `uv` from the repository:
+
+```bash
+uv run --extra ui scholar-forge ui
+```
+
+Defaults:
+
+- URL: `http://127.0.0.1:8765`
+- Runs directory: `./scholar-runs`
+- Override runs directory: `scholar-forge ui --runs-dir ./my-runs`
+
+The UI is a thin local interface over the existing bundle pipeline:
+
+- each search creates a new `scholar-runs/<timestamp>-<slug>/` bundle,
+- persisted research data remains the standard bundle files,
+- `run.json` is UI-only job metadata and is not part of the bundle contract,
+- the result page is a read-only audit view,
+- follow-up answers are grounded in the current bundle and are not persisted,
+- provider and LLM keys still come from `scholarforge.yaml` or environment variables.
 
 ## Configuration
 
@@ -109,4 +140,4 @@ print(bundle)
 - Cairn should record durable claims, artifacts, hypotheses, and links after evidence is reviewed.
 - BioMolHarness should consume bundles as task context or constraints, not as execution proof.
 - AutoSkills should use bundles only as background evidence; skill promotion still requires execution evidence.
-- ScholarForge should not grow into a daemon, vector database, chat interface, or long-form manuscript generator for the MVP.
+- ScholarForge should not grow into a daemon, vector database, durable chat system, or long-form manuscript generator for the MVP.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,23 @@ from .query_planner import plan_queries
 from .ranking import rank_sources
 from .resources import extract_resources
 from .utils import read_json, utc_now_iso
+
+ProgressCallback = Callable[[str, dict[str, Any]], None]
+CancelCallback = Callable[[], bool]
+
+
+class PipelineCancelled(RuntimeError):
+    """Raised when a caller requests cancellation at a pipeline boundary."""
+
+
+def _emit_progress(progress: ProgressCallback | None, stage: str, **detail: Any) -> None:
+    if progress:
+        progress(stage, detail)
+
+
+def _check_cancel(should_cancel: CancelCallback | None, stage: str) -> None:
+    if should_cancel and should_cancel():
+        raise PipelineCancelled(f"Pipeline cancelled during {stage}")
 
 
 def _json_object_from_text(text: str) -> dict[str, Any]:
@@ -107,7 +125,10 @@ class ScholarPipeline:
         *,
         out: str | Path,
         refresh: bool = False,
+        progress: ProgressCallback | None = None,
+        should_cancel: CancelCallback | None = None,
     ) -> Path:
+        _check_cancel(should_cancel, "start")
         if isinstance(request, (str, Path)) and Path(request).exists():
             req = load_request(request)
         elif isinstance(request, ResearchRequest):
@@ -117,17 +138,48 @@ class ScholarPipeline:
 
         req = self.apply_defaults(req)
         writer = BundleWriter(out)
+        _emit_progress(progress, "planning", question=req.question, out=str(writer.root))
         queries = self.plan(req, out=out)
-        sources = self._search_all(req, queries, writer, refresh=refresh)
+        _emit_progress(progress, "planned", queries=len(queries), out=str(writer.root))
+        _check_cancel(should_cancel, "planning")
+        sources = self._search_all(
+            req,
+            queries,
+            writer,
+            refresh=refresh,
+            progress=progress,
+            should_cancel=should_cancel,
+        )
+        _check_cancel(should_cancel, "searching")
+        _emit_progress(progress, "dedupe", sources=len(sources))
         deduped = dedupe_sources(sources)
+        _check_cancel(should_cancel, "dedupe")
+        _emit_progress(progress, "resources", sources=len(deduped))
         resources = extract_resources(req, deduped)
+        _check_cancel(should_cancel, "resources")
+        _emit_progress(progress, "ranking", sources=len(deduped))
         triage = rank_sources(req, deduped)
         if req.llm_triage:
+            _check_cancel(should_cancel, "llm_triage")
+            _emit_progress(progress, "llm_triage", sources=len(deduped))
             triage = self._apply_llm_triage(req, deduped, triage, writer)
         if req.read_pdf:
+            _check_cancel(should_cancel, "read_pdf")
+            _emit_progress(progress, "read_pdf", sources=len(deduped))
             self._read_selected_pdfs(req, deduped, triage, writer)
+        _check_cancel(should_cancel, "evidence")
+        _emit_progress(progress, "evidence", included=sum(1 for row in triage if row.decision == "include"))
         evidence = extract_evidence(req, deduped, triage)
 
+        _check_cancel(should_cancel, "writing")
+        _emit_progress(
+            progress,
+            "writing",
+            sources=len(deduped),
+            triage=len(triage),
+            evidence=len(evidence),
+            resources=len(resources),
+        )
         writer.write_sources(deduped)
         writer.write_triage(triage)
         writer.write_evidence(evidence)
@@ -135,7 +187,13 @@ class ScholarPipeline:
         for source in deduped:
             if any(item.source_id == source.source_id for item in evidence):
                 writer.write_note(source.source_id, note_for_source(source, evidence))
-        writer.write_brief(self._write_brief(req, deduped, triage, evidence, resources, writer))
+        fallback_brief = write_brief(req, deduped, triage, evidence, resources)
+        writer.write_brief(fallback_brief)
+        _check_cancel(should_cancel, "brief")
+        _emit_progress(progress, "brief", llm_enabled=req.use_llm)
+        brief = self._write_brief(req, deduped, triage, evidence, resources, writer, fallback=fallback_brief)
+        if brief != fallback_brief:
+            writer.write_brief(brief)
         writer.write_references(write_references(deduped, triage))
         writer.write_manifest(
             req,
@@ -145,6 +203,15 @@ class ScholarPipeline:
             evidence=len(evidence),
             resources=len(resources),
             extra={"completed_at": utc_now_iso()},
+        )
+        _emit_progress(
+            progress,
+            "done",
+            out=str(writer.root),
+            queries=len(queries),
+            sources=len(deduped),
+            evidence=len(evidence),
+            resources=len(resources),
         )
         return writer.root
 
@@ -156,8 +223,9 @@ class ScholarPipeline:
         evidence: list[Any],
         resources: list[Any],
         writer: BundleWriter,
+        fallback: str | None = None,
     ) -> str:
-        fallback = write_brief(request, sources, triage, evidence, resources)
+        fallback = fallback if fallback is not None else write_brief(request, sources, triage, evidence, resources)
         if not request.use_llm:
             return fallback
         try:
@@ -320,11 +388,23 @@ class ScholarPipeline:
         writer: BundleWriter,
         *,
         refresh: bool,
+        progress: ProgressCallback | None = None,
+        should_cancel: CancelCallback | None = None,
     ) -> list[SourceRecord]:
         all_sources: list[SourceRecord] = []
         limit = self.config.max_search_results_per_query()
-        for query in queries:
+        for query_index, query in enumerate(queries, start=1):
+            _check_cancel(should_cancel, "searching")
             for provider_name in query.provider_targets:
+                _check_cancel(should_cancel, "searching")
+                _emit_progress(
+                    progress,
+                    "searching",
+                    query=query.query,
+                    query_index=query_index,
+                    query_count=len(queries),
+                    provider=provider_name,
+                )
                 provider = self.providers.get(provider_name)
                 if provider is None:
                     writer.append_provenance(
@@ -351,6 +431,14 @@ class ScholarPipeline:
                         status = "ok"
                     normalized = provider.normalize(raw, query, request)
                     all_sources.extend(normalized)
+                    _emit_progress(
+                        progress,
+                        "search_result",
+                        query=query.query,
+                        provider=provider_name,
+                        status=status,
+                        result_count=len(normalized),
+                    )
                     writer.append_provenance(
                         {
                             "timestamp": utc_now_iso(),
@@ -361,6 +449,8 @@ class ScholarPipeline:
                             "result_count": len(normalized),
                         }
                     )
+                except PipelineCancelled:
+                    raise
                 except Exception as exc:
                     writer.append_provenance(
                         {
@@ -440,5 +530,13 @@ def run_research(
     out: str | Path,
     refresh: bool = False,
     config_path: str | Path | None = None,
+    progress: ProgressCallback | None = None,
+    should_cancel: CancelCallback | None = None,
 ) -> Path:
-    return ScholarPipeline.from_config(config_path).run(request, out=out, refresh=refresh)
+    return ScholarPipeline.from_config(config_path).run(
+        request,
+        out=out,
+        refresh=refresh,
+        progress=progress,
+        should_cancel=should_cancel,
+    )
