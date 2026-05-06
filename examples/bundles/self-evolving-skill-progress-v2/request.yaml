@@ -1,0 +1,16 @@
+question: self-evolving agent skills research progress skill learning tool use agents
+  self-improvement
+domain: agent_skills
+profile: agent_skills
+year_range: 2022-
+max_papers: 20
+providers:
+- tavily
+- semantic_scholar
+- openalex
+- arxiv
+constraints: {}
+language: en
+read_pdf: false
+use_llm: true
+llm_triage: false

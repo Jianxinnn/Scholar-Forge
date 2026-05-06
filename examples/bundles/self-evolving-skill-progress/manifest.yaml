@@ -1,0 +1,23 @@
+bundle_id: bundle_567e9dc8746013d81017
+bundle_format_version: '1.0'
+created_at: '2026-05-06T08:03:12+00:00'
+question: self-evolving agent skills research progress skill learning tool use agents
+  self-improvement
+profile: general
+counts:
+  queries: 4
+  sources: 63
+  triage: 63
+  evidence: 20
+files:
+  manifest: manifest.yaml
+  request: request.yaml
+  queries: queries.jsonl
+  sources: sources.jsonl
+  triage: triage.jsonl
+  evidence: evidence.jsonl
+  brief: brief.md
+  references: references.bib
+  provenance: provenance.jsonl
+provenance:
+  completed_at: '2026-05-06T08:03:12+00:00'
