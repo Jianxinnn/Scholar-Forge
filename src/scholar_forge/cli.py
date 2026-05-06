@@ -65,7 +65,8 @@ def cmd_inspect(args: argparse.Namespace) -> int:
         "Counts: "
         f"queries={counts['queries']} sources={counts['sources']} "
         f"include={counts['include']} maybe={counts['maybe']} "
-        f"exclude={counts['exclude']} evidence={counts['evidence']}"
+        f"exclude={counts['exclude']} evidence={counts['evidence']} "
+        f"resources={counts['resources']}"
     )
     missing = [name for name, exists in info["files"].items() if not exists]
     if missing:

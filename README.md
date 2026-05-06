@@ -70,6 +70,7 @@ scholar-bundle/
   sources.jsonl
   triage.jsonl
   evidence.jsonl
+  resources.jsonl
   brief.md
   references.bib
   provenance.jsonl
@@ -104,7 +105,7 @@ print(bundle)
 
 - ScholarForge produces auditable research evidence bundles.
 - The bundle is the product; `brief.md` is a human audit memo, not the primary data store.
-- Downstream agents should rely on `sources.jsonl`, `triage.jsonl`, `evidence.jsonl`, and `provenance.jsonl` for traceable decisions.
+- Downstream agents should rely on `sources.jsonl`, `resources.jsonl`, `triage.jsonl`, `evidence.jsonl`, and `provenance.jsonl` for traceable decisions.
 - Cairn should record durable claims, artifacts, hypotheses, and links after evidence is reviewed.
 - BioMolHarness should consume bundles as task context or constraints, not as execution proof.
 - AutoSkills should use bundles only as background evidence; skill promotion still requires execution evidence.

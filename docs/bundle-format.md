@@ -2,7 +2,7 @@
 
 ScholarForge's core product is an auditable evidence bundle. It writes a directory bundle instead of one large JSON file so downstream agents can inspect, diff, reuse, and audit each stage independently.
 
-Current format version: `1.0`
+Current format version: `1.1`
 
 ```text
 scholar-bundle/
@@ -12,6 +12,7 @@ scholar-bundle/
   sources.jsonl
   triage.jsonl
   evidence.jsonl
+  resources.jsonl
   brief.md
   references.bib
   provenance.jsonl
@@ -39,7 +40,7 @@ Required fields:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `bundle_id` | string | Stable hash-based bundle identifier. |
-| `bundle_format_version` | string | Current value: `1.0`. |
+| `bundle_format_version` | string | Current value: `1.1`. |
 | `created_at` | string | UTC ISO-8601 timestamp for the manifest write. |
 | `question` | string | Research question after request defaults are applied. |
 | `profile` | string | Active profile after defaults are applied. |
@@ -125,6 +126,23 @@ Required fields:
 | `evidence_text` | string | Evidence excerpt from metadata, abstract, snippet, TLDR, or PDF preview. |
 
 Common optional fields include `evidence_kind`, `supports_or_contradicts`, `confidence`, and `source_locator`.
+
+## `resources.jsonl`
+
+Each line captures one candidate resource entry derived from `sources.jsonl`. Resource extraction is independent of `triage.jsonl`: a source excluded from evidence synthesis may still yield useful resources for downstream tools.
+
+Required fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `resource_id` | string | Stable resource identifier. |
+| `resource_kind` | string | One of `paper`, `web_page`, `full_text`, `pdf`, `structure`, `sequence`, `dataset`, `code`, `protocol`, `patent`, or `other`. |
+| `source_ids` | list[string] | Source records that produced or supported this resource. |
+| `status` | string | Current first-version value is `candidate`; future values may include `verified` or `failed`. |
+
+Common optional fields include `title`, `url`, `identifiers`, `access`, `providers`, `confidence`, `reason`, and `raw`.
+
+`access` entries may include provider-returned URLs and deterministic derived URLs. Derived URLs must be marked with `source: derived`.
 
 ## `provenance.jsonl`
 

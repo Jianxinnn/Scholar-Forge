@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from .models import EvidenceRecord, ResearchRequest, SourceRecord, TriageRecord
+from collections import Counter
+
+from .models import EvidenceRecord, ResearchRequest, ResourceRecord, SourceRecord, TriageRecord
 
 
 def _wants_chinese(language: str) -> bool:
@@ -13,9 +15,10 @@ def write_brief(
     sources: list[SourceRecord],
     triage: list[TriageRecord],
     evidence: list[EvidenceRecord],
+    resources: list[ResourceRecord] | None = None,
 ) -> str:
     if _wants_chinese(request.language):
-        return _write_brief_zh(request, sources, triage, evidence)
+        return _write_brief_zh(request, sources, triage, evidence, resources or [])
 
     by_source = {source.source_id: source for source in sources}
     triage_by_source = {row.source_id: row for row in triage}
@@ -74,7 +77,7 @@ def write_brief(
     lines.append("- Review `triage.jsonl` for excluded or borderline sources.")
     lines.append("- Deep-read top included papers before turning claims into experimental constraints.")
     lines.append("- Record durable claims and contradictions in Cairn only after evidence is checked.")
-    return "\n".join(lines).strip() + "\n"
+    return append_resource_index("\n".join(lines).strip() + "\n", request, resources or [])
 
 
 def _write_brief_zh(
@@ -82,6 +85,7 @@ def _write_brief_zh(
     sources: list[SourceRecord],
     triage: list[TriageRecord],
     evidence: list[EvidenceRecord],
+    resources: list[ResourceRecord],
 ) -> str:
     by_source = {source.source_id: source for source in sources}
     triage_by_source = {row.source_id: row for row in triage}
@@ -140,7 +144,50 @@ def _write_brief_zh(
     lines.append("- 复核 `triage.jsonl` 中被排除或边界状态的来源。")
     lines.append("- 将 claims 转成实验约束前，先深读 top included papers。")
     lines.append("- 只有在证据含义清楚后，才把 durable claims 和 contradictions 记录到 Cairn。")
-    return "\n".join(lines).strip() + "\n"
+    return append_resource_index("\n".join(lines).strip() + "\n", request, resources)
+
+
+def _resource_url(resource: ResourceRecord) -> str:
+    if resource.url:
+        return resource.url
+    for item in resource.access:
+        url = item.get("url", "")
+        if url:
+            return url
+    return ""
+
+
+def _resource_index_lines(request: ResearchRequest, resources: list[ResourceRecord]) -> list[str]:
+    chinese = _wants_chinese(request.language)
+    heading = "## 资源索引" if chinese else "## Resource Index"
+    lines = ["", heading, ""]
+    if not resources:
+        lines.append("- No candidate resources were identified." if not chinese else "- 未识别到候选 resource。")
+        return lines
+
+    counts = Counter(resource.resource_kind for resource in resources)
+    for kind, count in sorted(counts.items()):
+        suffix = "" if count == 1 else "s"
+        if chinese:
+            lines.append(f"- {kind}: {count} candidate resources")
+        else:
+            lines.append(f"- {kind}: {count} candidate resource{suffix}")
+
+    lines.extend(["", "Representative resources:"])
+    for resource in sorted(resources, key=lambda item: (-item.confidence, item.resource_kind, item.title.lower()))[:5]:
+        url = _resource_url(resource)
+        label = resource.title or resource.resource_id
+        if url:
+            lines.append(f"- {resource.resource_kind}: {label} - {url}")
+        else:
+            lines.append(f"- {resource.resource_kind}: {label}")
+    return lines
+
+
+def append_resource_index(brief: str, request: ResearchRequest, resources: list[ResourceRecord]) -> str:
+    if "## Resource Index" in brief or "## 资源索引" in brief:
+        return brief if brief.endswith("\n") else brief + "\n"
+    return brief.rstrip() + "\n" + "\n".join(_resource_index_lines(request, resources)).rstrip() + "\n"
 
 
 def build_llm_brief_prompt(

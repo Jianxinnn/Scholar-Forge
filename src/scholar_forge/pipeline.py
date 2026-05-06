@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .bibtex import write_references
-from .brief import build_llm_brief_prompt, write_brief
+from .brief import append_resource_index, build_llm_brief_prompt, write_brief
 from .bundle import BundleWriter, load_request
 from .config import ScholarForgeConfig, load_config
 from .dedupe import dedupe_sources
@@ -15,6 +15,7 @@ from .providers import provider_registry
 from .providers.base import SearchProvider
 from .query_planner import plan_queries
 from .ranking import rank_sources
+from .resources import extract_resources
 from .utils import read_json, utc_now_iso
 
 
@@ -119,6 +120,7 @@ class ScholarPipeline:
         queries = self.plan(req, out=out)
         sources = self._search_all(req, queries, writer, refresh=refresh)
         deduped = dedupe_sources(sources)
+        resources = extract_resources(req, deduped)
         triage = rank_sources(req, deduped)
         if req.llm_triage:
             triage = self._apply_llm_triage(req, deduped, triage, writer)
@@ -129,10 +131,11 @@ class ScholarPipeline:
         writer.write_sources(deduped)
         writer.write_triage(triage)
         writer.write_evidence(evidence)
+        writer.write_resources(resources)
         for source in deduped:
             if any(item.source_id == source.source_id for item in evidence):
                 writer.write_note(source.source_id, note_for_source(source, evidence))
-        writer.write_brief(self._write_brief(req, deduped, triage, evidence, writer))
+        writer.write_brief(self._write_brief(req, deduped, triage, evidence, resources, writer))
         writer.write_references(write_references(deduped, triage))
         writer.write_manifest(
             req,
@@ -140,6 +143,7 @@ class ScholarPipeline:
             sources=len(deduped),
             triage=len(triage),
             evidence=len(evidence),
+            resources=len(resources),
             extra={"completed_at": utc_now_iso()},
         )
         return writer.root
@@ -150,9 +154,10 @@ class ScholarPipeline:
         sources: list[SourceRecord],
         triage: list[Any],
         evidence: list[Any],
+        resources: list[Any],
         writer: BundleWriter,
     ) -> str:
-        fallback = write_brief(request, sources, triage, evidence)
+        fallback = write_brief(request, sources, triage, evidence, resources)
         if not request.use_llm:
             return fallback
         try:
@@ -173,7 +178,7 @@ class ScholarPipeline:
                     "model": self.config.llm_model,
                 }
             )
-            return brief + "\n"
+            return append_resource_index(brief + "\n", request, resources)
         except Exception as exc:
             writer.append_provenance(
                 {

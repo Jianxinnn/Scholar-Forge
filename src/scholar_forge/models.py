@@ -157,6 +157,39 @@ class EvidenceRecord:
 
 
 @dataclass(slots=True)
+class ResourceRecord:
+    resource_id: str
+    resource_kind: str
+    source_ids: list[str] = field(default_factory=list)
+    title: str = ""
+    url: str = ""
+    identifiers: dict[str, list[str]] = field(default_factory=dict)
+    access: list[dict[str, str]] = field(default_factory=list)
+    providers: list[str] = field(default_factory=list)
+    status: str = "candidate"
+    confidence: float = 0.5
+    reason: str = ""
+    raw: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ResourceRecord":
+        return cls(
+            resource_id=str(data.get("resource_id", "")),
+            resource_kind=str(data.get("resource_kind", "") or ""),
+            source_ids=list(data.get("source_ids") or []),
+            title=str(data.get("title", "") or ""),
+            url=str(data.get("url", "") or ""),
+            identifiers={str(k): list(v or []) for k, v in dict(data.get("identifiers") or {}).items()},
+            access=[dict(item) for item in list(data.get("access") or []) if isinstance(item, dict)],
+            providers=list(data.get("providers") or []),
+            status=str(data.get("status", "candidate") or "candidate"),
+            confidence=float(data.get("confidence", 0.5) or 0.5),
+            reason=str(data.get("reason", "") or ""),
+            raw=dict(data.get("raw") or {}),
+        )
+
+
+@dataclass(slots=True)
 class BundleManifest:
     bundle_id: str
     bundle_format_version: str

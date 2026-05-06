@@ -16,13 +16,14 @@ ResearchRequest
   -> provider search
   -> source normalization
   -> deduplication
+  -> resource extraction
   -> deterministic ranking
   -> optional LLM triage
   -> evidence extraction
   -> bundle writing
 ```
 
-The first version treats `scholar-bundle/` as the product. `sources.jsonl`, `triage.jsonl`, `evidence.jsonl`, and `provenance.jsonl` are the primary machine-readable surfaces. `brief.md` is a human audit memo.
+The first version treats `scholar-bundle/` as the product. `sources.jsonl`, `resources.jsonl`, `triage.jsonl`, `evidence.jsonl`, and `provenance.jsonl` are the primary machine-readable surfaces. `brief.md` is a human audit memo.
 
 ## Product Boundaries
 
@@ -30,6 +31,7 @@ ScholarForge does:
 
 - retrieve and normalize scholarly/web sources,
 - deduplicate overlapping provider results,
+- extract candidate resources independently from evidence triage,
 - rank and triage sources,
 - optionally apply LLM triage,
 - extract conservative evidence records,

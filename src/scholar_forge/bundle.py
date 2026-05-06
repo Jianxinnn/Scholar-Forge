@@ -12,6 +12,7 @@ from .models import (
     EvidenceRecord,
     QueryRecord,
     ResearchRequest,
+    ResourceRecord,
     SourceRecord,
     TriageRecord,
 )
@@ -19,7 +20,7 @@ from .utils import dumps_json, ensure_dir, safe_id, stable_hash, to_plain_data, 
 
 
 T = TypeVar("T")
-BUNDLE_FORMAT_VERSION = "1.0"
+BUNDLE_FORMAT_VERSION = "1.1"
 REQUIRED_BUNDLE_FILES = {
     "manifest": "manifest.yaml",
     "request": "request.yaml",
@@ -27,6 +28,7 @@ REQUIRED_BUNDLE_FILES = {
     "sources": "sources.jsonl",
     "triage": "triage.jsonl",
     "evidence": "evidence.jsonl",
+    "resources": "resources.jsonl",
     "brief": "brief.md",
     "references": "references.bib",
     "provenance": "provenance.jsonl",
@@ -36,6 +38,7 @@ JSONL_REQUIRED_FIELDS = {
     "sources": {"source_id", "title", "provider"},
     "triage": {"source_id", "decision", "total_score"},
     "evidence": {"evidence_id", "source_id", "claim", "evidence_text"},
+    "resources": {"resource_id", "resource_kind", "source_ids", "status"},
 }
 
 
@@ -66,6 +69,10 @@ class BundlePaths:
     @property
     def evidence(self) -> Path:
         return self.root / "evidence.jsonl"
+
+    @property
+    def resources(self) -> Path:
+        return self.root / "resources.jsonl"
 
     @property
     def brief(self) -> Path:
@@ -152,6 +159,9 @@ class BundleWriter:
     def write_evidence(self, evidence: list[EvidenceRecord]) -> None:
         write_jsonl(self.paths.evidence, evidence)
 
+    def write_resources(self, resources: list[ResourceRecord]) -> None:
+        write_jsonl(self.paths.resources, resources)
+
     def write_brief(self, brief: str) -> None:
         self.paths.brief.write_text(brief, encoding="utf-8")
 
@@ -182,6 +192,7 @@ class BundleWriter:
         sources: int = 0,
         triage: int = 0,
         evidence: int = 0,
+        resources: int = 0,
         extra: dict[str, Any] | None = None,
     ) -> BundleManifest:
         manifest = BundleManifest(
@@ -195,6 +206,7 @@ class BundleWriter:
                 "sources": sources,
                 "triage": triage,
                 "evidence": evidence,
+                "resources": resources,
             },
             files=REQUIRED_BUNDLE_FILES.copy(),
             provenance=extra or {},
@@ -219,6 +231,7 @@ def inspect_bundle(path: str | Path) -> dict[str, Any]:
     sources = read_jsonl(paths.sources)
     triage = read_jsonl(paths.triage)
     evidence = read_jsonl(paths.evidence)
+    resources = read_jsonl(paths.resources)
     include_count = sum(1 for row in triage if row.get("decision") == "include")
     maybe_count = sum(1 for row in triage if row.get("decision") == "maybe")
     exclude_count = sum(1 for row in triage if row.get("decision") == "exclude")
@@ -236,6 +249,7 @@ def inspect_bundle(path: str | Path) -> dict[str, Any]:
             "maybe": maybe_count,
             "exclude": exclude_count,
             "evidence": len(evidence),
+            "resources": len(resources),
         },
         "files": {
             "manifest": paths.manifest.exists(),
@@ -244,6 +258,7 @@ def inspect_bundle(path: str | Path) -> dict[str, Any]:
             "sources": paths.sources.exists(),
             "triage": paths.triage.exists(),
             "evidence": paths.evidence.exists(),
+            "resources": paths.resources.exists(),
             "brief": paths.brief.exists(),
             "references": paths.references.exists(),
             "provenance": paths.provenance.exists(),
@@ -276,6 +291,7 @@ def validate_bundle(path: str | Path) -> list[str]:
         "sources": paths.sources,
         "triage": paths.triage,
         "evidence": paths.evidence,
+        "resources": paths.resources,
     }
     for name, jsonl_path in jsonl_paths.items():
         if not jsonl_path.exists():

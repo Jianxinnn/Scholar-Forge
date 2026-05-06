@@ -54,7 +54,9 @@ def test_pipeline_run_with_fake_provider(tmp_path) -> None:
     assert info["counts"]["sources"] == 1
     assert info["counts"]["include"] == 1
     assert info["counts"]["evidence"] == 1
+    assert info["counts"]["resources"] == 1
     assert info["validation_errors"] == []
+    assert (out / "resources.jsonl").exists()
     assert (out / "brief.md").read_text(encoding="utf-8").startswith("# Research Brief")
 
 

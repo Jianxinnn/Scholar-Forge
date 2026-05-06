@@ -59,11 +59,12 @@ Read bundle files in this order:
 scholar-bundle/brief.md
 scholar-bundle/triage.jsonl
 scholar-bundle/evidence.jsonl
+scholar-bundle/resources.jsonl
 scholar-bundle/sources.jsonl
 scholar-bundle/provenance.jsonl
 ```
 
-Treat `brief.md` as an audit memo, not a final survey. Use `evidence.jsonl`, `triage.jsonl`, `sources.jsonl`, and `provenance.jsonl` for decisions that need traceability.
+Treat `brief.md` as an audit memo, not a final survey. Use `evidence.jsonl`, `resources.jsonl`, `triage.jsonl`, `sources.jsonl`, and `provenance.jsonl` for decisions that need traceability.
 
 ## Profiles
 
@@ -110,6 +111,7 @@ queries.jsonl
 sources.jsonl
 triage.jsonl
 evidence.jsonl
+resources.jsonl
 brief.md
 references.bib
 provenance.jsonl
@@ -117,7 +119,7 @@ raw/
 notes/
 ```
 
-`manifest.yaml` includes `bundle_format_version: '1.0'`. `scholar-forge inspect` validates required files and basic schema.
+`manifest.yaml` includes `bundle_format_version: '1.1'`. `scholar-forge inspect` validates required files and basic schema.
 
 ## Examples
 

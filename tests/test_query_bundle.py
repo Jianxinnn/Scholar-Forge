@@ -23,5 +23,7 @@ def test_biomol_plan_writes_bundle(tmp_path) -> None:
     info = inspect_bundle(out)
     assert info["counts"]["queries"] == len(queries)
     assert info["files"]["manifest"] is True
+    assert info["files"]["resources"] is False
     manifest = read_yaml(out / "manifest.yaml")
     assert manifest["bundle_format_version"] == BUNDLE_FORMAT_VERSION
+    assert manifest["files"]["resources"] == "resources.jsonl"

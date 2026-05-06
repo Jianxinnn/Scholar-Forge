@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from scholar_forge.config import load_config
-from scholar_forge.models import ResearchRequest, SourceRecord
+from scholar_forge.models import ResearchRequest, ResourceRecord, SourceRecord
 from scholar_forge.pipeline import ScholarPipeline
 from scholar_forge.utils import title_fingerprint
 
@@ -42,6 +42,21 @@ def test_source_record_from_dict() -> None:
     assert source.source_id == "s1"
     assert source.authors == ["A"]
     assert source.year == 2024
+
+
+def test_resource_record_from_dict() -> None:
+    resource = ResourceRecord.from_dict(
+        {
+            "resource_id": "res_pdb_5j13",
+            "resource_kind": "structure",
+            "source_ids": ["s1"],
+            "identifiers": {"pdb_ids": ["5J13"]},
+            "access": [{"kind": "mmcif", "url": "https://files.rcsb.org/download/5J13.cif"}],
+        }
+    )
+    assert resource.resource_kind == "structure"
+    assert resource.identifiers["pdb_ids"] == ["5J13"]
+    assert resource.status == "candidate"
 
 
 def test_config_env_expansion(tmp_path, monkeypatch) -> None:

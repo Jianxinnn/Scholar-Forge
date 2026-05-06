@@ -24,6 +24,7 @@ flowchart LR
     Pipeline --> Providers["Provider Registry"]
     Pipeline --> Dedupe["Deduplication"]
     Pipeline --> Ranking["Deterministic Ranking<br/>threshold + max_papers cap"]
+    Pipeline --> Resources["Resource Extraction<br/>candidate tool inputs"]
     Pipeline --> LLMTriage["Optional LLM Triage"]
     Pipeline --> PDF["Optional PDF Reader"]
     Pipeline --> Evidence["Evidence Extraction"]
@@ -52,6 +53,7 @@ flowchart TD
     Search --> Normalize["Normalize Sources<br/>SourceRecord"]
     Normalize --> Dedupe["Deduplicate<br/>DOI / provider IDs / title fingerprint"]
     Dedupe --> Rank["Rank Sources<br/>keyword + evidence + recency + impact + profile"]
+    Dedupe --> Resources["Extract Resources<br/>independent of triage"]
     Rank --> Threshold["Assign Decisions<br/>include / maybe / exclude"]
     Threshold --> MaybeLLM{"llm_triage?"}
 
@@ -66,10 +68,11 @@ flowchart TD
     Evidence --> Sources["Write sources.jsonl"]
     Sources --> Triage["Write triage.jsonl"]
     Triage --> EvidenceFile["Write evidence.jsonl"]
-    EvidenceFile --> Notes["Write notes/*.md"]
+    EvidenceFile --> ResourcesFile["Write resources.jsonl"]
+    ResourcesFile --> Notes["Write notes/*.md"]
     Notes --> Brief["Write brief.md"]
     Brief --> Bib["Write references.bib"]
-    Bib --> Manifest["Write manifest.yaml<br/>bundle_format_version: 1.0"]
+    Bib --> Manifest["Write manifest.yaml<br/>bundle_format_version: 1.1"]
     Manifest --> Done["Inspectable Bundle<br/>Files: ok / Schema: ok"]
 ```
 
@@ -83,6 +86,7 @@ flowchart LR
     Bundle --> Sources["sources.jsonl<br/>normalized sources"]
     Bundle --> Triage["triage.jsonl<br/>scores and decisions"]
     Bundle --> Evidence["evidence.jsonl<br/>claim-linked excerpts"]
+    Bundle --> Resources["resources.jsonl<br/>candidate resources"]
     Bundle --> Brief["brief.md<br/>human audit memo"]
     Bundle --> Bib["references.bib<br/>included references"]
     Bundle --> Provenance["provenance.jsonl<br/>pipeline events"]
@@ -94,6 +98,7 @@ flowchart LR
     Manifest -. "schema checked by inspect" .-> Sources
     Manifest -. "schema checked by inspect" .-> Triage
     Manifest -. "schema checked by inspect" .-> Evidence
+    Manifest -. "schema checked by inspect" .-> Resources
 ```
 
 ## Module Map
@@ -114,6 +119,7 @@ flowchart TB
         DedupeFile["dedupe.py"]
         RankingFile["ranking.py"]
         EvidenceFile2["evidence.py"]
+        ResourcesFile2["resources.py"]
         BriefFile["brief.py"]
         BibFile["bibtex.py"]
         BundleFile["bundle.py"]
@@ -143,6 +149,7 @@ flowchart TB
     PipelineFile --> DedupeFile
     PipelineFile --> RankingFile
     PipelineFile --> EvidenceFile2
+    PipelineFile --> ResourcesFile2
     PipelineFile --> BriefFile
     PipelineFile --> BibFile
     PipelineFile --> BundleFile
